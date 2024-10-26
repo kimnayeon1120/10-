@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>친근한 챗봇</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Apple SD Gothic Neo', sans-serif;
+        }
+
+        body {
+            background: #f0f2f5;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .api-key-container {
+            background: white;
+            padding: 20px;
+            border-radius: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 400px;
+        }
+
+        .api-key-container input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #e9ecef;
+            border-radius: 10px;
+            margin-top: 5px;
+        }
+
+        .chat-container {
+            width: 100%;
+            max-width: 400px;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+
+        .chat-header {
+            background: #4a90e2;
+            color: white;
+            padding: 20px;
+            text-align: center;
+            font-size: 1.2em;
+        }
+
+        .chat-messages {
+            height: 400px;
+            overflow-y: auto;
+            padding: 20px;
+        }
+
+        .message {
+            margin-bottom: 15px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .message-content {
+            max-width: 80%;
+            padding: 10px 15px;
+            border-radius: 15px;
+            margin: 5px 0;
+        }
+
+        .user-message {
+            align-items: flex-end;
+        }
+
+        .user-message .message-content {
+            background: #4a90e2;
+            color: white;
+        }
+
+        .bot-message {
+            align-items: flex-start;
+        }
+
+        .bot-message .message-content {
+            background: #e9ecef;
+            color: black;
+        }
+
+        .chat-input {
+            padding: 20px;
+            background: white;
+            border-top: 1px solid #e9ecef;
+            display: flex;
+            gap: 10px;
+        }
+
+        #message-input {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid #e9ecef;
+            border-radius: 20px;
+            outline: none;
+        }
+
+        #send-button {
+            background: #4a90e2;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 20px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        #send-button:hover {
+            background: #357abd;
+        }
+
+        .message-time {
+            font-size: 0.8em;
+            color: #666;
+            margin: 0 5px;
+        }
+
+        .weather-card {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 10px;
+            margin-top: 5px;
+        }
+
+        .error-message {
+            color: #dc3545;
+            font-size: 0.9em;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="api-key-container">
+        <label for="api-key">OpenWeatherMap API 키</label>
+        <input type="text" id="api-key" placeholder="API 키를 입력하세요">
+        <p class="error-message" id="api-error" style="display: none;"></p>
+    </div>
+
+    <div class="chat-container">
+        <div class="chat-header">
+            친근한 챗봇 🤖
+        </div>
+        <div class="chat-messages" id="chat-messages">
+        </div>
+        <div class="chat-input">
+            <input type="text" id="message-input" placeholder="메시지를 입력하세요...">
+            <button id="send-button">전송</button>
+        </div>
+    </div>
+
+    <script>
+        const chatMessages = document.getElementById('chat-messages');
+        const messageInput = document.getElementById('message-input');
+        const sendButton = document.getElementById('send-button');
+        const apiKeyInput = document.getElementById('api-key');
+        const apiError = document.getElementById('api-error');
+
+        let weatherApiKey = localStorage.getItem('weatherApiKey') || '';
+        if (weatherApiKey) {
+            apiKeyInput.value = weatherApiKey;
+        }
+
+        // API 키 저장
+        apiKeyInput.addEventListener('change', (e) => {
+            weatherApiKey = e.target.value;
+            localStorage.setItem('weatherApiKey', weatherApiKey);
+            apiError.style.display = 'none';
+        });
+
+        // 날씨 정보 가져오기
+        async function getWeather(city = 'Seoul') {
+            if (!weatherApiKey) {
+                throw new Error('API 키를 입력해주세요!');
+            }
+
+            try {
+                const response = await fetch(
+                    `https://api.openweathermap.org/data/2.5/weather?q=${city}&appid=${weatherApiKey}&units=metric&lang=kr`
+                );
+                
+                if (!response.ok) {
+                    throw new Error('날씨 정보를 가져오는데 실패했습니다. API 키를 확인해주세요.');
+                }
+
+                const data = await response.json();
+                return {
+                    temp: Math.round(data.main.temp),
+                    description: data.weather[0].description,
+                    humidity: data.main.humidity,
+                    windSpeed: data.wind.speed
+                };
+            } catch (error) {
+                apiError.textContent = error.message;
+                apiError.style.display = 'block';
+                throw error;
+            }
+        }
+
+        // 챗봇 응답 데이터
+        const botResponses = {
+            greetings: [
+                "안녕하세요! 오늘도 좋은 하루 보내세요! 😊",
+                "반가워요! 무엇을 도와드릴까요? 🌟",
+                "어서오세요! 오늘은 어떤 이야기를 나눠볼까요? ✨"
+            ],
+            jokes: [
+                "왜 컴퓨터는 목이 마를까요? 웹 브라우저를 너무 많이 열어서요! 😄",
+                "프로그래머가 머리를 감는 방법은? 샴푸, 린스, 반복! 🚿",
+                "일주일 중 가장 강한 요일은? 수(水)요일! 💪"
+            ],
+            comfort: [
+                "그런 일이 있었군요. 많이 힘들었겠어요. 💝",
+                "제가 이야기를 들어드릴게요. 마음이 어떠신가요? 🤗",
+                "힘든 일이 있으시군요. 함께 이야기 나누면서 해결해보아요. 💪"
+            ]
+        };
+
+        // 메시지 추가 함수
+        function addMessage(content, isUser = false) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${isUser ? 'user-message' : 'bot-message'}`;
+            
+            const time = new Date().toLocaleTimeString('ko-KR', { 
+                hour: '2-digit', 
+                minute: '2-digit'
+            });
+
+            messageDiv.innerHTML = `
+                <span class="message-time">${time}</span>
+                <div class="message-content">${content}</div>
+            `;
+            
+            chatMessages.appendChild(messageDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        // 날씨 정보 메시지 생성
+        function createWeatherMessage(weatherData) {
+            return `
+                <div class="weather-card">
+                    현재 날씨 정보 🌡️
+                    <br>온도: ${weatherData.temp}°C
+                    <br>날씨: ${weatherData.description}
+                    <br>습도: ${weatherData.humidity}%
+                    <br>풍속: ${weatherData.windSpeed}m/s
+                </div>
+            `;
+        }
+
+        // 챗봇 응답 생성 함수
+        async function generateBotResponse(message) {
+            const messageLower = message.toLowerCase();
+            
+            if (messageLower.includes('안녕')) {
+                return botResponses.greetings[Math.floor(Math.random() * botResponses.greetings.length)];
+            }
+            else if (messageLower.includes('날씨')) {
+                try {
+                    const weatherData = await getWeather();
+                    return createWeatherMessage(weatherData);
+                } catch (error) {
+                    return "죄송해요, 날씨 정보를 가져오는데 문제가 발생했어요. API 키를 확인해주세요. 😢";
+                }
+            }
+            else if (messageLower.includes('재미') || messageLower.includes('농담')) {
+                return botResponses.jokes[Math.floor(Math.random() * botResponses.jokes.length)];
+            }
+            else if (messageLower.includes('힘들') || messageLower.includes('슬퍼') || messageLower.includes('우울')) {
+                return botResponses.comfort[Math.floor(Math.random() * botResponses.comfort.length)];
+            }
+            
+            return "더 자세히 말씀해 주시겠어요? 제가 도와드릴 수 있는 방법을 찾아볼게요! 😊";
+        }
+
+        // 메시지 전송 처리
+        async function handleSendMessage() {
+            const message = messageInput.value.trim();
+            if (message) {
+                addMessage(message, true);
+                messageInput.value = '';
+                
+                // 챗봇 응답 (약간의 지연 효과 추가)
+                setTimeout(async () => {
+                    const botResponse = await generateBotResponse(message);
+                    addMessage(botResponse);
+                }, 500);
+            }
+        }
+
+        // 이벤트 리스너 등록
+        sendButton.addEventListener('click', handleSendMessage);
+        messageInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                handleSendMessage();
+            }
+        });
+
+        // 초기 메시지
+        setTimeout(() => {
+            addMessage("안녕하세요! 저는 당신의 친근한 챗봇이에요. 날씨 정보를 확인하시려면 OpenWeatherMap API 키를 입력해주세요! 😊");
+        }, 500);
+    </script>
+</body>
+</html>
